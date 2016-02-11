@@ -8,9 +8,9 @@ include.php
  *
  * @category        snippet
  * @package         newslist
- * @version         0.2.3
+ * @version         0.2.5
  * @authors         Martin Hecht (mrbaseman) <mrbaseman@gmx.de>
- * @copyright       2016 Martin Hecht (mrbaseman)
+ * @copyright       (c) 2016, Martin Hecht (mrbaseman)
  * @link            forum.websitebaker.org/index.php/topic,28924
  * @license         GNU General Public License, Version 3
  * @platform        WebsiteBaker 2.8.x
@@ -29,7 +29,14 @@ if(!defined('WB_PATH')) {
 
 
 if (!function_exists('list_news')) {
-        
+
+function addBracketNewsList()
+{
+    $aList = func_get_args();
+    return preg_replace('/^(.*)$/', '[$1]', $aList);
+};
+
+      
 function list_news($section_id = 0, $g = 0, $p = 0) {
         
 // the following is mainly taken from view.php of the news module
@@ -125,7 +132,7 @@ if (($query_users = $database->query($sql))) {
         $setting_posts_per_page = '';
     }
 // Print header
-    $aPlaceHolders = makePhExp(
+    $aPlaceHolders = addBracketNewsList(
         'DISPLAY_PREVIOUS_NEXT_LINKS',
         'NEXT_PAGE_LINK',
         'NEXT_LINK',
@@ -140,7 +147,7 @@ if (($query_users = $database->query($sql))) {
     print (preg_replace($aPlaceHolders, $aReplacements, $setting_header));
     if ($num_posts > 0)
     {
-        $aPlaceHolders = makePhExp(
+        $aPlaceHolders = addBracketNewsList(
             'PAGE_TITLE',
             'GROUP_ID',
             'GROUP_TITLE',
@@ -231,7 +238,7 @@ if (($query_users = $database->query($sql))) {
                     $publ_time
                 );
                 if (isset($users[$uid]['username']) AND $users[$uid]['username'] != '') {
-                        $aReplacements[] = '#" onclick="javascript:void(0);return false;" style="cursor:no-drop;';
+                        $aReplacements[] = $post_link;
                         $aReplacements[] = 'hidden';
                         $aReplacements[] = '';
                         $aReplacements[] = $uid;
@@ -239,15 +246,16 @@ if (($query_users = $database->query($sql))) {
                         $aReplacements[] = $users[$uid]['display_name'];
                         $aReplacements[] = $users[$uid]['email'];
                 } else {
-                        $aReplacements[] = '#" onclick="javascript:void(0);return false;" style="cursor:no-drop;';
+                        $aReplacements[] = $post_link;
                         $aReplacements[] = 'hidden';
+                        $aReplacements[] = '';
                 }
-                print (preg_replace($aPlaceHolders, $aReplacements, $setting_post_loop));
+                print (str_replace($aPlaceHolders, $aReplacements, $setting_post_loop));
             }
         }
     }
     // Print footer
-    $aPlaceHolders = makePhExp(
+    $aPlaceHolders = addBracketNewsList(
         'DISPLAY_PREVIOUS_NEXT_LINKS',
         'NEXT_PAGE_LINK',
         'NEXT_LINK',
@@ -259,7 +267,7 @@ if (($query_users = $database->query($sql))) {
     $aReplacements = array(
         $display_previous_next_links
     );
-    print (preg_replace($aPlaceHolders, $aReplacements, $setting_footer));
+    print (str_replace($aPlaceHolders, $aReplacements, $setting_footer));
 
 
 } // function list_news
