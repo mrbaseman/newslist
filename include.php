@@ -8,14 +8,14 @@ include.php
  *
  * @category        snippet
  * @package         newslist
- * @version         0.2.5
+ * @version         0.2.8
  * @authors         Martin Hecht (mrbaseman) <mrbaseman@gmx.de>
- * @copyright       (c) 2016, Martin Hecht (mrbaseman)
- * @link            forum.websitebaker.org/index.php/topic,28924
+ * @copyright       (c) 2019, Martin Hecht (mrbaseman)
+ * @link            https://github.com/WebsiteBaker-modules/newslist
  * @license         GNU General Public License, Version 3
  * @platform        WebsiteBaker 2.8.x
  * @requirements    PHP 5.4 and higher
- * 
+ *
  **/
 
 
@@ -23,6 +23,7 @@ include.php
 // Must include code to stop this file being accessed directly
 if(!defined('WB_PATH')) {
         // Stop this file being access directly
+        if(!headers_sent()) header("Location: ../index.php",TRUE,301);
         die('<head><title>Access denied</title></head><body><h2 style="color:red;margin:3em auto;text-align:center;">Cannot access this file directly</h2></body></html>');
 }
 /* -------------------------------------------------------- */
@@ -36,16 +37,23 @@ function addBracketNewsList()
     return preg_replace('/^(.*)$/', '[$1]', $aList);
 };
 
-      
+
 function list_news($section_id = 0, $g = 0, $p = 0) {
-        
+
 // the following is mainly taken from view.php of the news module
 
 global $post_id, $post_section, $TEXT, $MESSAGE, $MOD_NEWS, $database;
+$table="news";
+// determine which module to use
+$sql = 'SELECT * '
+     . 'FROM `'.TABLE_PREFIX.'mod_'.$table.'_settings` '
+     . 'WHERE `section_id`='.(int)$section_id;
+$query_settings = $database->query($sql);
+if ((NULL == $query_settings) or ($query_settings->numRows()==0)) $table="news_img";
 
 // load module language file
-$lang = (WB_PATH.'/modules/news/languages/' . LANGUAGE . '.php');
-require_once(!file_exists($lang) ? WB_PATH.'/modules/news/languages/EN.php' : $lang );
+$lang = (WB_PATH.'/modules/'.$table.'/languages/' . LANGUAGE . '.php');
+require_once(!file_exists($lang) ? WB_PATH.'/modules/'.$table.'/languages/EN.php' : $lang );
 
 //overwrite php.ini on Apache servers for valid SESSION ID Separator
 if (function_exists('ini_set')) {
@@ -69,14 +77,14 @@ $groups = array(
         'image'     => ''
     )
 );
-$sql = 'SELECT `group_id`, `title`, `active` FROM `'.TABLE_PREFIX.'mod_news_groups` '
+$sql = 'SELECT `group_id`, `title`, `active` FROM `'.TABLE_PREFIX.'mod_'.$table.'_groups` '
      . 'WHERE `section_id`='.(int)$section_id.' '
      . 'ORDER BY `position` ASC';
 if (($query_users = $database->query($sql))) {
     while (($group = $query_users->fetchRow())) {
         // Insert user info into users array
         $groups[$group['group_id']] = $group;
-        $sImageUrl = MEDIA_DIRECTORY.'/.news/image'.$group['group_id'].'.jpg';
+        $sImageUrl = MEDIA_DIRECTORY.'/.'.$table.'/image'.$group['group_id'].'.jpg';
         $groups[$group['group_id']]['image'] = (is_readable(WB_PATH.$sImageUrl) ? WB_URL.$sImageUrl : '');
     }
 }
@@ -86,10 +94,11 @@ if (($query_users = $database->query($sql))) {
     } else {
         $query_extra = '';
     }
+
     // Get settings
     $setting_header = $setting_post_loop = $setting_footer = $setting_posts_per_page = '';
     $sql = 'SELECT `header`, `post_loop`, `footer`, `posts_per_page` '
-         . 'FROM `'.TABLE_PREFIX.'mod_news_settings` '
+         . 'FROM `'.TABLE_PREFIX.'mod_'.$table.'_settings` '
          . 'WHERE `section_id`='.(int)$section_id;
     if (($resSettings = $database->query($sql))) {
         if (($recSettings = $resSettings->fetchRow(MYSQL_ASSOC))) {
@@ -100,7 +109,7 @@ if (($query_users = $database->query($sql))) {
     }
     // Get total number of posts relatet to now
     $t = time();
-    $sql = 'SELECT COUNT(*) FROM `'.TABLE_PREFIX.'mod_news_posts` '
+    $sql = 'SELECT COUNT(*) FROM `'.TABLE_PREFIX.'mod_'.$table.'_posts` '
          . 'WHERE `section_id`='.(int)$section_id.' AND `active`=1 '
          .        'AND `title`!=\'\' '
          .        'AND (`published_when`=0 OR `published_when`<='.$t.') '
@@ -114,7 +123,7 @@ if (($query_users = $database->query($sql))) {
         $limit_sql = '';
     }
     // Query posts (for this page)
-    $sql = 'SELECT * FROM `'.TABLE_PREFIX.'mod_news_posts` '
+    $sql = 'SELECT * FROM `'.TABLE_PREFIX.'mod_'.$table.'_posts` '
          . 'WHERE `section_id`='.$section_id.' '
          .        'AND `active`=1 '
          .        'AND `title`!=\'\' '
@@ -122,7 +131,7 @@ if (($query_users = $database->query($sql))) {
          .        'AND (`published_until`=0 OR `published_until`>='.$t.') '
          .        $query_extra
          . 'ORDER BY `position` DESC'.$limit_sql;
-    $query_posts = $database->query($sql);         
+    $query_posts = $database->query($sql);
     $num_posts = $query_posts->numRows();
     $display_previous_next_links = 'none';
     if ($num_posts === 0) {
@@ -155,6 +164,7 @@ if (($query_users = $database->query($sql))) {
             'DISPLAY_GROUP',
             'DISPLAY_IMAGE',
             'TITLE',
+            'IMAGE',
             'SHORT',
             'MODI_DATE',
             'MODI_TIME',
@@ -193,6 +203,7 @@ if (($query_users = $database->query($sql))) {
                 // Work-out the post link
                 $post_link      = page_link($post['link']);
                 $post_link_path = str_replace(WB_URL, WB_PATH,$post_link);
+                if(!isset($post['created_when']))$post['created_when']=0;
                 $create_date    = date(DATE_FORMAT, $post['created_when']);
                 $create_time    = date(TIME_FORMAT, $post['created_when']);
                 if ($p > 0) {
@@ -216,6 +227,14 @@ if (($query_users = $database->query($sql))) {
                 if ($group_image != "") {
                     $group_image= "<img src='".$group_image."' alt='".$group_title."' />";
                 }
+                $post_image = "";
+                if(isset($post['image'])){
+                    if ($post['image'] != "") {
+                        $post_img = "<img src='".WB_URL.MEDIA_DIRECTORY.'/.news_img/'.$post['post_id'].'/'.$post['image']."' alt='".$post['title']."' />";
+                    } else {
+                        $post_img = "<img src='".WB_URL."/modules/news_img/images/nopic.png' alt='empty placeholder' />";
+                    }
+                }
                 // Replace [wblink--PAGE_ID--] with real link
                 $short = "";
                 // Replace vars with values
@@ -229,6 +248,7 @@ if (($query_users = $database->query($sql))) {
                     $display_group,
                     $display_image,
                     $post['title'],
+                    $post_image,
                     $short,
                     $post_date,
                     $post_time,
